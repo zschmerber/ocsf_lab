@@ -93,7 +93,7 @@ services:
       - app-network        
 
   tenzir-node:
-    container_name: "rain"
+    container_name: "tenzir" # name it what you name your tenzir pipline 
     image: "tenzir/tenzir:latest"
     pull_policy: always
     environment:
