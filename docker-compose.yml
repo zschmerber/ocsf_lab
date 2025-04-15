@@ -1,0 +1,124 @@
+version: "3.8"
+services:
+  clickhouse:
+    image: clickhouse/clickhouse-server
+    user: "101:101"
+    container_name: clickhouse
+    hostname: clickhouse
+    volumes:
+      - ${PWD}/fs/volumes/clickhouse/etc/clickhouse-server/config.d/config.xml:/etc/clickhouse-server/config.d/config.xml
+      - ${PWD}/fs/volumes/clickhouse/etc/clickhouse-server/users.d/users.xml:/etc/clickhouse-server/users.d/users.xml
+      - ${PWD}/fs/volumes/clickhouse/docker-entrypoint-initdb.d:/docker-entrypoint-initdb.d
+    ports:
+      - "127.0.0.1:8123:8123"
+      - "127.0.0.1:9000:9000"
+    depends_on:
+      - clickhouse-keeper
+    networks:
+      - app-network    
+
+  clickhouse-keeper:
+    image: 'clickhouse/clickhouse-keeper:${CHKVER:-latest-alpine}'
+    user: '101:101'
+    container_name: clickhouse-keeper
+    hostname: clickhouse-keeper
+    volumes:
+      - ${PWD}/fs/volumes/clickhouse-keeper/etc/clickhouse-keeper/keeper_config.xml:/etc/clickhouse-keeper/keeper_config.xml
+    ports:
+      - '127.0.0.1:9181:9181'
+
+
+  grafana:
+    build: 
+      context: ${PWD}/docker_files/
+      dockerfile: grafana.Dockerfile
+    container_name: grafana
+    hostname: grafana
+    volumes:
+      - ${PWD}/fs/volumes/grafana/etc/grafana/provisioning/datasources:/etc/grafana/provisioning/datasources
+    ports:
+      - "127.0.0.1:3000:3000"
+    depends_on:
+      - clickhouse
+    networks:
+      - app-network
+
+  minio:
+    image: quay.io/minio/minio
+    container_name: minio
+    hostname: minio
+    command: server --address 0.0.0.0:10000 --console-address 0.0.0.0:10001 /data
+    ports:
+      - '127.0.0.1:10000:10000'
+      - '127.0.0.1:10001:10001'
+    environment:
+      - MINIO_ROOT_USER=admin
+      - MINIO_ROOT_PASSWORD=password
+    networks:
+      - app-network
+  createbuckets:
+    image: minio/mc
+    depends_on:
+      - minio
+    entrypoint: >
+      /bin/sh -c "
+      until (/usr/bin/mc alias set minio http://minio:10000 admin password) do echo '...waiting...' && sleep 1; done;
+      /usr/bin/mc rm -r --force minio/clickhouse;
+      /usr/bin/mc admin info minio;
+      /usr/bin/mc mb minio/clickhouse;
+      /usr/bin/mc policy set public minio/clickhouse;
+      /usr/bin/mc rm -r --force minio/raw;
+      /usr/bin/mc admin info minio;
+      /usr/bin/mc mb minio/raw;
+      /usr/bin/mc policy set public minio/raw;
+      /usr/bin/mc cp /data/dns.json minio/raw/;
+      exit 0;
+      "
+    volumes:
+      - ./raw_data:/data
+    networks:
+      - app-network
+  tabix:
+    image: spoonest/clickhouse-tabix-web-client:latest
+ 
+    # because I'm running on M1 Mac (ARM architecture)
+    platform: linux/amd64
+    container_name: tabix
+    hostname: tabix
+    ports:
+      - "8080:80"
+    depends_on:
+      - clickhouse
+    networks:
+      - app-network        
+
+  tenzir-node:
+    container_name: "rain"
+    image: "tenzir/tenzir:latest"
+    pull_policy: always
+    environment:
+      - TENZIR_TOKEN=<key>
+      - TENZIR_PLATFORM_CONTROL_ENDPOINT=<path>
+      - TENZIR_ENDPOINT=tenzir-node:5158
+    entrypoint:
+      - tenzir-node
+    volumes:
+      - tenzir-lib:/var/lib/tenzir/
+      - tenzir-log:/var/log/tenzir/
+    healthcheck:
+      test: tenzir --connection-timeout=30s --connection-retry-delay=1s 'api /ping'
+      interval: 30s
+      retries: 1
+    networks:
+      - app-network     
+networks:
+  app-network:
+    driver: bridge
+
+volumes:
+  clickhouse_data:
+  clickhouse_log:
+  minio_data:
+  tenzir_data:
+  tenzir-lib:
+  tenzir-log:
