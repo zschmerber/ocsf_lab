@@ -49,6 +49,7 @@ http://localhost:8123/play
 ```
 
 // tql2
+
 let $proto_nums = {
   tcp: 6,
   udp: 17,
@@ -56,9 +57,11 @@ let $proto_nums = {
   icmpv6: 58,
   ipv6: 41,
 }
-
+let $now = now() //adding this for demo 
+every 1s {
 load_s3 "s3://admin:password@raw/dns.json?endpoint_override=http://minio:10000"
-read_json
+read_ndjson
+}
 this = { zeek: this }
 // === Classification ===
 ocsf.activity_id = 6
@@ -71,7 +74,8 @@ ocsf.severity_id = 1
 ocsf.severity = "Informational"
 ocsf.type_uid = ocsf.class_uid * 100 + ocsf.activity_id
 // === Occurrence ===
-ocsf.time = zeek.ts
+ocsf.time = $now
+//ocsf.time = since_epoch(ocsf.time_dt) -> duration //ocsf.time = zeek.ts
 drop zeek.ts
 ocsf.start_time = ocsf.time
 // === Context ===
@@ -130,10 +134,16 @@ if zeek.id.orig_h.is_v6() or zeek.id.resp_h.is_v6() {
 drop zeek.id
 ocsf.status = "Unknown"
 ocsf.status_id = 0
+//ocsf = flatten(ocsf, "_")
+
 this = {...ocsf, unmapped: zeek}
-@name = "ocsf.dns_activity"
-head 1
-//write_parquet
-//save_s3 "s3://admin:password@clickhouse/ocsfdns2.parquet?endpoint_override=http://minio:10000"
-//to_clickhouse table="ocsf_dns_activity", host="clickhouse", primary=json, tls=false
+drop unmapped // unmapped had some malfomed headers i did not know how to remove 
+this = flatten(this, "_")
+
+// @name = "ocsf.dns_activity"
+write_ndjson strip_null_fields=true, strip_empty_records = true, strip_empty_lists = true
+read_ndjson
+
+to_clickhouse table="dns_activity1", host="clickhouse", primary=activity_id, tls=false
 ```
+the above TQL takes the logs flattens them and removes nulls then sends to clickhouse default 

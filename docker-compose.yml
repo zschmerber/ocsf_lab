@@ -93,12 +93,12 @@ services:
       - app-network        
 
   tenzir-node:
-    container_name: "tenzir" # name it what you name your tenzir pipline 
-    image: "tenzir/tenzir:latest"
+    container_name: "sun"
+    image: "ghcr.io/tenzir/tenzir:topic-clickhouse-fixes"
     pull_policy: always
     environment:
-      - TENZIR_TOKEN=<key>
-      - TENZIR_PLATFORM_CONTROL_ENDPOINT=<path>
+      - TENZIR_TOKEN=
+      - TENZIR_PLATFORM_CONTROL_ENDPOINT=
       - TENZIR_ENDPOINT=tenzir-node:5158
     entrypoint:
       - tenzir-node
