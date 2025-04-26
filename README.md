@@ -47,9 +47,6 @@ password
 
 http://localhost:8123/play
 ```
-
-// tql2
-
 let $proto_nums = {
   tcp: 6,
   udp: 17,
@@ -57,11 +54,8 @@ let $proto_nums = {
   icmpv6: 58,
   ipv6: 41,
 }
-let $now = now() //adding this for demo 
-every 1s {
-load_s3 "s3://admin:password@raw/dns.json?endpoint_override=http://minio:10000"
-read_ndjson
-}
+
+from "s3://admin:password@raw/dns.json.gz?endpoint_override=http://minio:10000"
 this = { zeek: this }
 // === Classification ===
 ocsf.activity_id = 6
@@ -74,7 +68,7 @@ ocsf.severity_id = 1
 ocsf.severity = "Informational"
 ocsf.type_uid = ocsf.class_uid * 100 + ocsf.activity_id
 // === Occurrence ===
-ocsf.time = $now
+ocsf.time = time
 //ocsf.time = since_epoch(ocsf.time_dt) -> duration //ocsf.time = zeek.ts
 drop zeek.ts
 ocsf.start_time = ocsf.time
@@ -144,6 +138,6 @@ this = flatten(this, "_")
 write_ndjson strip_null_fields=true, strip_empty_records = true, strip_empty_lists = true
 read_ndjson
 
-to_clickhouse table="dns_activity1", host="clickhouse", primary=activity_id, tls=false
+//to_clickhouse table="dns_test", host="clickhouse", primary=activity_id, tls=false
 ```
 the above TQL takes the logs flattens them and removes nulls then sends to clickhouse default 

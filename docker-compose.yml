@@ -12,20 +12,20 @@ services:
     ports:
       - "127.0.0.1:8123:8123"
       - "127.0.0.1:9000:9000"
-    depends_on:
-      - clickhouse-keeper
+    # depends_on:
+    #   - clickhouse-keeper
     networks:
       - app-network    
 
-  clickhouse-keeper:
-    image: 'clickhouse/clickhouse-keeper:${CHKVER:-latest-alpine}'
-    user: '101:101'
-    container_name: clickhouse-keeper
-    hostname: clickhouse-keeper
-    volumes:
-      - ${PWD}/fs/volumes/clickhouse-keeper/etc/clickhouse-keeper/keeper_config.xml:/etc/clickhouse-keeper/keeper_config.xml
-    ports:
-      - '127.0.0.1:9181:9181'
+  # clickhouse-keeper:
+  #   image: 'clickhouse/clickhouse-keeper:${CHKVER:-latest-alpine}'
+  #   user: '101:101'
+  #   container_name: clickhouse-keeper
+  #   hostname: clickhouse-keeper
+  #   volumes:
+  #     - ${PWD}/fs/volumes/clickhouse-keeper/etc/clickhouse-keeper/keeper_config.xml:/etc/clickhouse-keeper/keeper_config.xml
+  #   ports:
+  #     - '127.0.0.1:9181:9181'
 
 
   grafana:
@@ -71,34 +71,35 @@ services:
       /usr/bin/mc admin info minio;
       /usr/bin/mc mb minio/raw;
       /usr/bin/mc policy set public minio/raw;
-      /usr/bin/mc cp /data/dns.json minio/raw/;
+      /usr/bin/mc cp /data/* minio/raw/;
       exit 0;
       "
     volumes:
-      - ./raw_data:/data
+      - ./raw_data/zeek-json:/data
     networks:
       - app-network
-  tabix:
-    image: spoonest/clickhouse-tabix-web-client:latest
+  # tabix:
+  #   image: spoonest/clickhouse-tabix-web-client:latest
  
-    # because I'm running on M1 Mac (ARM architecture)
-    platform: linux/amd64
-    container_name: tabix
-    hostname: tabix
-    ports:
-      - "8080:80"
-    depends_on:
-      - clickhouse
-    networks:
-      - app-network        
+  #   # because I'm running on M1 Mac (ARM architecture)
+  #   platform: linux/amd64
+  #   container_name: tabix
+  #   hostname: tabix
+  #   ports:
+  #     - "8080:80"
+  #   depends_on:
+  #     - clickhouse
+  #   networks:
+  #     - app-network        
+
 
   tenzir-node:
-    container_name: "sun"
-    image: "ghcr.io/tenzir/tenzir:topic-clickhouse-fixes"
+    container_name: "solitude"
+    image: "tenzir/tenzir:latest"
     pull_policy: always
     environment:
-      - TENZIR_TOKEN=
-      - TENZIR_PLATFORM_CONTROL_ENDPOINT=
+      - TENZIR_TOKEN=<token>
+      - TENZIR_PLATFORM_CONTROL_ENDPOINT=<path>
       - TENZIR_ENDPOINT=tenzir-node:5158
     entrypoint:
       - tenzir-node
