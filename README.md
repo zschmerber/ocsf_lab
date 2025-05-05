@@ -55,7 +55,10 @@ let $proto_nums = {
   ipv6: 41,
 }
 
-from "s3://admin:password@raw/dns.json.gz?endpoint_override=http://minio:10000" 
+from "s3://admin:password@raw/dns.json.gz?endpoint_override=http://minio:10000" {
+  decompress_gzip
+  read_ndjson raw=true
+  }
 this = { zeek: this }
 // === Classification ===
 ocsf.activity_id = 6
@@ -68,7 +71,7 @@ ocsf.severity_id = 1
 ocsf.severity = "Informational"
 ocsf.type_uid = ocsf.class_uid * 100 + ocsf.activity_id
 // === Occurrence ===
-ocsf.time = as_secs(since_epoch(zeek.ts))
+ocsf.time = as_secs(since_epoch(time(zeek.ts)))
 ocsf.time_dt = zeek.ts
 ocsf.start_time = ocsf.time
 // === Context ===
@@ -127,17 +130,17 @@ if zeek.id.orig_h.is_v6() or zeek.id.resp_h.is_v6() {
 drop zeek.id
 ocsf.status = "Unknown"
 ocsf.status_id = 0
-//ocsf = flatten(ocsf, "_")
 
 this = {...ocsf, unmapped: zeek}
-//drop unmapped // unmapped had some malfomed headers i did not know how to remove 
-//this = flatten(this, "_")
+drop unmapped // unmapped had some malfomed headers i did not know how to remove 
+this = flatten(this, "_")
 
 @name = "ocsf.dns_activity"
-//write_json strip_null_fields=true, strip_empty_records = true, strip_empty_lists = true
-to "s3://admin:password@clickhouse/ocsfdns.json?endpoint_override=http://minio:10000" 
+write_ndjson strip_null_fields=true, strip_empty_records = true, strip_empty_lists = true
+read_ndjson
+//to "s3://admin:password@clickhouse/ocsfdns.json?endpoint_override=http://minio:10000" 
 
 
-//to_clickhouse table="dnshead", host="clickhouse", primary=activity_name, tls=false
+to_clickhouse table="dnshead2222", host="clickhouse", primary=activity_name, tls=false
 ```
 the above TQL takes the logs flattens them and removes nulls then sends to clickhouse default 
