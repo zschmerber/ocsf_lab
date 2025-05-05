@@ -55,7 +55,7 @@ let $proto_nums = {
   ipv6: 41,
 }
 
-from "s3://admin:password@raw/dns.json.gz?endpoint_override=http://minio:10000"
+from "s3://admin:password@raw/dns.json.gz?endpoint_override=http://minio:10000" 
 this = { zeek: this }
 // === Classification ===
 ocsf.activity_id = 6
@@ -68,9 +68,8 @@ ocsf.severity_id = 1
 ocsf.severity = "Informational"
 ocsf.type_uid = ocsf.class_uid * 100 + ocsf.activity_id
 // === Occurrence ===
-ocsf.time = time
-//ocsf.time = since_epoch(ocsf.time_dt) -> duration //ocsf.time = zeek.ts
-drop zeek.ts
+ocsf.time = as_secs(since_epoch(zeek.ts))
+ocsf.time_dt = zeek.ts
 ocsf.start_time = ocsf.time
 // === Context ===
 ocsf.metadata = {
@@ -131,13 +130,14 @@ ocsf.status_id = 0
 //ocsf = flatten(ocsf, "_")
 
 this = {...ocsf, unmapped: zeek}
-drop unmapped // unmapped had some malfomed headers i did not know how to remove 
-this = flatten(this, "_")
+//drop unmapped // unmapped had some malfomed headers i did not know how to remove 
+//this = flatten(this, "_")
 
-// @name = "ocsf.dns_activity"
-write_ndjson strip_null_fields=true, strip_empty_records = true, strip_empty_lists = true
-read_ndjson
+@name = "ocsf.dns_activity"
+//write_json strip_null_fields=true, strip_empty_records = true, strip_empty_lists = true
+to "s3://admin:password@clickhouse/ocsfdns.json?endpoint_override=http://minio:10000" 
 
-//to_clickhouse table="dns_test", host="clickhouse", primary=activity_id, tls=false
+
+//to_clickhouse table="dnshead", host="clickhouse", primary=activity_name, tls=false
 ```
 the above TQL takes the logs flattens them and removes nulls then sends to clickhouse default 

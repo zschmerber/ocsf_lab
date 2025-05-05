@@ -21,10 +21,34 @@
         <distributed_ddl>
         <path>/clickhouse/task_queue/ddl</path>
     </distributed_ddl>
-    <zookeeper>
-        <node>
-            <host>clickhouse-keeper</host>
-            <port>9181</port>
-        </node>
-    </zookeeper>
+    <storage_configuration>
+            <disks>
+                <s3>
+                    <type>s3</type>
+                    <endpoint>http://minio:10000/clickhouse//</endpoint>
+                    <access_key_id>admin</access_key_id>
+                    <secret_access_key>password</secret_access_key>
+                    <region></region>
+                    <metadata_path>/var/lib/clickhouse/disks/s3/</metadata_path>
+                </s3>
+                <s3_cache>
+                    <type>cache</type>
+                    <disk>s3</disk>
+                    <path>/var/lib/clickhouse/disks/s3_cache/</path>
+                    <max_size>10Gi</max_size>
+                </s3_cache>
+            </disks>
+            <policies>
+                <s3_main>
+                    <volumes>
+                        <s3>
+                            <disk>s3</disk>
+                        </s3>
+                    </volumes>
+                </s3_main>
+            </policies>
+        </storage_configuration>
+        <backups>
+            <allowed_disk>s3</allowed_disk>
+        </backups>
 </clickhouse>

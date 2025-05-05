@@ -12,22 +12,11 @@ services:
     ports:
       - "127.0.0.1:8123:8123"
       - "127.0.0.1:9000:9000"
-    # depends_on:
-    #   - clickhouse-keeper
     networks:
       - app-network    
-
-  # clickhouse-keeper:
-  #   image: 'clickhouse/clickhouse-keeper:${CHKVER:-latest-alpine}'
-  #   user: '101:101'
-  #   container_name: clickhouse-keeper
-  #   hostname: clickhouse-keeper
-  #   volumes:
-  #     - ${PWD}/fs/volumes/clickhouse-keeper/etc/clickhouse-keeper/keeper_config.xml:/etc/clickhouse-keeper/keeper_config.xml
-  #   ports:
-  #     - '127.0.0.1:9181:9181'
-
-
+    depends_on:
+      - minio
+      - createbuckets
   grafana:
     build: 
       context: ${PWD}/docker_files/
@@ -98,8 +87,8 @@ services:
     image: "tenzir/tenzir:latest"
     pull_policy: always
     environment:
-      - TENZIR_TOKEN=<token>
-      - TENZIR_PLATFORM_CONTROL_ENDPOINT=<path>
+      - TENZIR_TOKEN=<add token> 
+      - TENZIR_PLATFORM_CONTROL_ENDPOINT= <add endpoint>
       - TENZIR_ENDPOINT=tenzir-node:5158
     entrypoint:
       - tenzir-node
