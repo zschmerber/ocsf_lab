@@ -35,18 +35,20 @@ The Minio dashboard server will then be available at http://localhost:10000 or h
 user = admin
 password = password
 ```
-3. proceed to https://tenzir.com/ create login and make a docker node 
-4. copy docker config keys and path found in Tenzir docker file, add key and path to docker compose file 
+3. proceed to https://tenzir.com/ create login and make a docker node
+4. copy docker config keys and path found in Tenzir docker file, add key and path to docker compose file
 
 To stop everything, just run `docker-compose down`.
 ```
 Default logins
 Default logins for each container:
-admin 
+admin
 password
 
 http://localhost:8123/play
 ```
+
+
 let $proto_nums = {
   tcp: 6,
   udp: 17,
@@ -55,10 +57,18 @@ let $proto_nums = {
   ipv6: 41,
 }
 
-from "s3://admin:password@raw/dns.json.gz?endpoint_override=http://minio:10000" {
+let $input_path = "s3://admin:password@raw/dns.json.gz?endpoint_override=http://minio:10000"
+
+from $input_path {
   decompress_gzip
-  read_ndjson raw=true
-  }
+  read_zeek_json
+}
+drop _path
+
+// This section is pretty much just the mapping from
+// https://github.com/tenzir/library/blob/main/zeek-ocsf/package.yaml
+
+where @name == "zeek.dns"
 this = { zeek: this }
 // === Classification ===
 ocsf.activity_id = 6
@@ -71,42 +81,37 @@ ocsf.severity_id = 1
 ocsf.severity = "Informational"
 ocsf.type_uid = ocsf.class_uid * 100 + ocsf.activity_id
 // === Occurrence ===
-ocsf.time = as_secs(since_epoch(time(zeek.ts)))
-ocsf.time_dt = zeek.ts
+move ocsf.time = zeek.ts
 ocsf.start_time = ocsf.time
 // === Context ===
 ocsf.metadata = {
   log_name: "dns.log",
-  logged_time: zeek._write_ts,
+  logged_time: move zeek._write_ts?,
   product: {
     name: "Zeek",
     vendor_name: "Zeek",
     cpe_name: "cpe:2.3:a:zeek:zeek",
   },
-  uid: zeek.uid,
+  uid: move zeek.uid,
   version: "1.4.0",
 }
-drop zeek._path, zeek._write_ts, zeek.uid
+drop zeek._path? // implied in metadata.log_name
 // === Primary ===
-ocsf.answers = zip(zeek.answers, zeek.TTLs).map(x, {
+ocsf.answers = zip(move zeek.answers, move zeek.TTLs).map(x, {
   rdata: x.left,
   ttl: x.right,
 })
-drop zeek.answers, zeek.TTLs
 ocsf.query = {
-  class: zeek.qclass_name,
-  hostname: zeek.query,
+  class: move zeek.qclass_name,
+  hostname: move zeek.query,
   // TODO: go deeper and extract the log semantics.
   //opcode_id: 0,
-  type: zeek.qtype_name,
+  type: move zeek.qtype_name,
 }
 ocsf.query_time = ocsf.time
 ocsf.response_time = ocsf.time
-ocsf.rcode = zeek.rcode_name
-drop zeek.rcode_name
-ocsf.rcode_id = zeek.rcode
-drop zeek.rcode
-drop zeek.qclass_name, zeek.query, zeek.qtype_name
+move ocsf.rcode = zeek.rcode_name
+move ocsf.rcode_id = zeek.rcode
 ocsf.src_endpoint = {
   ip: zeek.id.orig_h,
   port: zeek.id.orig_p,
@@ -118,10 +123,9 @@ ocsf.dst_endpoint = {
 ocsf.connection_info = {
   direction: "Other",
   direction_id: 99,
-  protocol_name: zeek.proto,
-  protocol_num: $proto_nums[zeek.proto].otherwise(-1),
+  protocol_name: move zeek.proto,
+  protocol_num: $proto_nums[zeek.proto] else -1
 }
-drop zeek.proto
 if zeek.id.orig_h.is_v6() or zeek.id.resp_h.is_v6() {
   ocsf.connection_info.protocol_ver_id = 6
 } else {
@@ -130,17 +134,16 @@ if zeek.id.orig_h.is_v6() or zeek.id.resp_h.is_v6() {
 drop zeek.id
 ocsf.status = "Unknown"
 ocsf.status_id = 0
+this = {...ocsf, unmapped: zeek.print_ndjson()}
+@name = "ocsf.dns_activity"
 
-this = {...ocsf, unmapped: zeek}
-drop unmapped // unmapped had some malfomed headers i did not know how to remove 
+// Tenzir package copy ends here
+// Below are the remaining transformations for clickhouse
+
 this = flatten(this, "_")
 
-@name = "ocsf.dns_activity"
-write_ndjson strip_null_fields=true, strip_empty_records = true, strip_empty_lists = true
-read_ndjson
-//to "s3://admin:password@clickhouse/ocsfdns.json?endpoint_override=http://minio:10000" 
-
+//to "s3://admin:password@clickhouse/ocsfdns.json?endpoint_override=http://minio:10000"
 
 to_clickhouse table="dnshead2222", host="clickhouse", primary=activity_name, tls=false
 ```
-the above TQL takes the logs flattens them and removes nulls then sends to clickhouse default 
+the above TQL takes the logs flattens them and removes nulls then sends to clickhouse default
