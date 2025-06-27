@@ -48,7 +48,6 @@ password
 http://localhost:8123/play
 ```
 
-
 let $proto_nums = {
   tcp: 6,
   udp: 17,
@@ -68,7 +67,6 @@ drop _path
 // This section is pretty much just the mapping from
 // https://github.com/tenzir/library/blob/main/zeek-ocsf/package.yaml
 
-where @name == "zeek.dns"
 this = { zeek: this }
 // === Classification ===
 ocsf.activity_id = 6
@@ -136,14 +134,8 @@ ocsf.status = "Unknown"
 ocsf.status_id = 0
 this = {...ocsf, unmapped: zeek.print_ndjson()}
 @name = "ocsf.dns_activity"
+ocsf::apply
 
-// Tenzir package copy ends here
-// Below are the remaining transformations for clickhouse
-
-this = flatten(this, "_")
-
-//to "s3://admin:password@clickhouse/ocsfdns.json?endpoint_override=http://minio:10000"
-
-to_clickhouse table="dnshead2222", host="clickhouse", primary=activity_name, tls=false
+to_clickhouse table="dns", host="clickhouse", primary=activity_name, tls=false
 ```
 the above TQL takes the logs flattens them and removes nulls then sends to clickhouse default
